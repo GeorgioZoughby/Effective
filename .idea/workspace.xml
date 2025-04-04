@@ -20,16 +20,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="505f96c4-d35b-45c2-997a-546511df7e89" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/include/Vector.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/include/VectorAdd.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/include/VectorExpression.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/include/VectorMul.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/include/VectorSub.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main2.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Vector.cpp" beforeDir="false" />
-    </list>
+    <list default="true" id="505f96c4-d35b-45c2-997a-546511df7e89" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -144,7 +135,7 @@
       <workItem from="1743750237687" duration="489000" />
       <workItem from="1743750769918" duration="2167000" />
       <workItem from="1743754878784" duration="935000" />
-      <workItem from="1743800279064" duration="4949000" />
+      <workItem from="1743800279064" duration="5393000" />
     </task>
     <servers />
   </component>
