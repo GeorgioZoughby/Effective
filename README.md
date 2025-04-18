@@ -108,12 +108,5 @@ nvcc -std=c++17 Vector.cu -o vector_cuda
 
 ---
 
-## Potential Improvements
 
-- Add memory pooling to avoid repeated `cudaMalloc`/`cudaFree`
-- Use pinned memory (`cudaHostAlloc`)
-- Fuse multiple kernels for batch operations
-- Add unit testing with CPU fallback comparison
-
----
 
