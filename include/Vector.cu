@@ -49,43 +49,55 @@ cudaError_t cuda_clear(T* elts, unsigned int size);
 
 
 template <typename T>
-__global__ void copyKernel(const T* from, T* to)
-{
-    int i = threadIdx.x;
-    to[i] = from[i];
-}
-
-template <typename Op, typename T>
-__global__ void scalarOpKernel(T* elts, const T scal, Op op)
-{
-    int i = threadIdx.x;
-    op(elts[i],scal);
-}
-
-template <typename T>
-__global__ void compareEqKernel(const T* elts1, const T* elts2, bool* equality)
-{
-    int i = threadIdx.x;
-    if (elts1[i] != elts2[i]) {
-        *equality = false;
+__global__ void copyKernel(const T* from, T* to, int size) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < size; i += stride) {
+        to[i] = from[i];
     }
 }
+
+
+template <typename Op, typename T>
+__global__ void scalarOpKernel(T* elts, const T scal, int size, Op op) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < size; i += stride) {
+        op(elts[i], scal);
+    }
+}
+
+
+template <typename T>
+__global__ void compareEqKernel(const T* elts1, const T* elts2, bool* equality, int size) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < size; i += stride) {
+        if (elts1[i] != elts2[i]) {
+            *equality = false;
+        }
+    }
+}
+
 
 template <typename T>
 __global__ void dotKernel(const T* elts1, const T* elts2, T* result, unsigned int size)
 {
-    /*int i = threadIdx.x;
-    *result += elts1[i] * elts2[i];*/
-
-    ////////////
-
     extern __shared__ T sdata[];
 
     unsigned int tid = threadIdx.x;
-    unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
+    unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int stride = blockDim.x * gridDim.x;
 
-    // Load elements into shared memory
-    sdata[tid] = (i < size) ? (elts1[i]*elts2[i]) : 0;
+    T sum = 0;
+
+    // Each thread accumulates its own partial sum
+    for (int i = index; i < size; i += stride) {
+        sum += elts1[i] * elts2[i];
+    }
+
+    // Store partial sum in shared memory
+    sdata[tid] = sum;
     __syncthreads();
 
     // Reduction in shared memory
@@ -102,12 +114,17 @@ __global__ void dotKernel(const T* elts1, const T* elts2, T* result, unsigned in
     }
 }
 
+
 template <typename T>
-__global__ void clearKernel(T* elts)
-{
-    int i = threadIdx.x;
-    elts[i].~T();
+__global__ void clearKernel(T* elts, int size) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < size; i += stride) {
+        elts[i] = T();  // reset to default
+    }
 }
+
+
 
 
 
@@ -437,7 +454,7 @@ public:
 
     T dot(const Vector<T>& other) const {
         if (_size != other._size) throw std::invalid_argument("Size mismatch");
-        T* temp = (int*)malloc(sizeof *temp);
+        T* temp = (int*)malloc(sizeof * temp);
         *temp = 0;
         cuda_dot(_elements, other._elements, _size, temp);
         return *temp;
@@ -559,7 +576,7 @@ private:
 template<typename T>
 bool operator==(const Vector<T>& a, const Vector<T>& b) {
     if (a.size() != b.size()) return false;
-    bool* equality = (bool*)malloc(sizeof *equality);
+    bool* equality = (bool*)malloc(sizeof * equality);
     *equality = true;
     cuda_compare_equality(a.data(), b.data(), a.size(), equality);
     return *equality;
@@ -690,70 +707,55 @@ int main() {
     return 0;
 }
 
+
+
+// =======================
+// Kernel Wrapper Functions with Streams
+// =======================
+
+// Each wrapper now uses a cudaStream_t for asynchronous operations
+
+// Helper macro to define stream and clean up
+#define CREATE_CUDA_STREAM(stream) \
+    cudaStream_t stream; \
+    cudaStreamCreate(&stream);
+
+#define DESTROY_CUDA_STREAM(stream) \
+    cudaStreamSynchronize(stream); \
+    cudaStreamDestroy(stream);
+
+
+
 template <typename T>
 cudaError_t cuda_copy(const T* from, T* to, unsigned int size) {
     T* dev_from = 0;
     T* dev_to = 0;
     cudaError_t cudaStatus;
+    CREATE_CUDA_STREAM(stream);
 
-    // Choose which GPU to run on, change this on a multi-GPU system.
     cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Allocate GPU buffers for three vectors (two input, one output)    .
     cudaStatus = cudaMalloc((void**)&dev_to, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
     cudaStatus = cudaMalloc((void**)&dev_from, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
+    cudaStatus = cudaMemcpyAsync(dev_from, from, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_from, from, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    copyKernel << <gridSize, blockSize, 0, stream >> > (dev_from, dev_to, size);
 
-
-    // Launch a kernel on the GPU with one thread for each element.
-    copyKernel << <1, size >> > (dev_from, dev_to);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(to, dev_to, size * sizeof(T), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(to, dev_to, size * sizeof(T), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
 Error:
+    DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_to);
     cudaFree(dev_from);
-
     return cudaStatus;
 }
 
@@ -763,60 +765,31 @@ template <typename Op, typename T>
 cudaError_t cuda_scalar_op(T* elts, const T scal, unsigned int size, Op op) {
     T* dev_elts = 0;
     cudaError_t cudaStatus;
+    CREATE_CUDA_STREAM(stream);
 
-    // Choose which GPU to run on, change this on a multi-GPU system.
     cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Allocate GPU buffers for three vectors (two input, one output)    .
     cudaStatus = cudaMalloc((void**)&dev_elts, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
+    cudaStatus = cudaMemcpyAsync(dev_elts, elts, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_elts, elts, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    scalarOpKernel << <gridSize, blockSize, 0, stream >> > (dev_elts, scal, size, op);
 
-
-    // Launch a kernel on the GPU with one thread for each element.
-    scalarOpKernel << <1, size >> > (dev_elts, scal, op);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(elts, dev_elts, size * sizeof(T), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(elts, dev_elts, size * sizeof(T), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
 Error:
+    DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_elts);
-
     return cudaStatus;
 }
+
+
 
 
 template <typename T>
@@ -825,79 +798,44 @@ cudaError_t cuda_compare_equality(const T* elts1, const T* elts2, unsigned int s
     T* dev_elts2 = 0;
     bool* dev_equality = 0;
     cudaError_t cudaStatus;
+    CREATE_CUDA_STREAM(stream);
 
-    // Choose which GPU to run on, change this on a multi-GPU system.
     cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Allocate GPU buffers for three vectors (two input, one output)    .
     cudaStatus = cudaMalloc((void**)&dev_elts1, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
     cudaStatus = cudaMalloc((void**)&dev_elts2, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
     cudaStatus = cudaMalloc((void**)&dev_equality, sizeof(bool));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_elts1, elts1, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(dev_elts1, elts1, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    cudaStatus = cudaMemcpy(dev_elts2, elts2, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(dev_elts2, elts2, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
+    cudaStatus = cudaMemsetAsync(dev_equality, 1, sizeof(bool), stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Launch a kernel on the GPU with one thread for each element.
-    compareEqKernel << <1, size >> > (dev_elts1, dev_elts2, dev_equality);
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    compareEqKernel << <gridSize, blockSize, 0, stream >> > (dev_elts1, dev_elts2, dev_equality, size);
 
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(equality, dev_equality, sizeof(bool), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(equality, dev_equality, sizeof(bool), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
 Error:
+    DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_elts1);
     cudaFree(dev_elts2);
     cudaFree(dev_equality);
-
     return cudaStatus;
 }
+
 
 
 template <typename T>
@@ -906,80 +844,42 @@ cudaError_t cuda_dot(const T* elts1, const T* elts2, unsigned int size, T* resul
     T* dev_elts2 = 0;
     T* dev_result = 0;
     cudaError_t cudaStatus;
+    CREATE_CUDA_STREAM(stream);
 
-    // Choose which GPU to run on, change this on a multi-GPU system.
     cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Allocate GPU buffers for three vectors (two input, one output)    .
     cudaStatus = cudaMalloc((void**)&dev_elts1, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
     cudaStatus = cudaMalloc((void**)&dev_elts2, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
     cudaStatus = cudaMalloc((void**)&dev_result, sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_elts1, elts1, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(dev_elts1, elts1, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    cudaStatus = cudaMemcpy(dev_elts2, elts2, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(dev_elts2, elts2, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
+
+    cudaStatus = cudaMemsetAsync(dev_result, 0, sizeof(T), stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
     int blockSize = 256;
     int gridSize = (size + blockSize - 1) / blockSize;
     size_t sharedMemSize = blockSize * sizeof(T);
+    dotKernel << <gridSize, blockSize, sharedMemSize, stream >> > (dev_elts1, dev_elts2, dev_result, size);
 
-    // Launch a kernel on the GPU with one thread for each element.
-    dotKernel << <gridSize, blockSize, sharedMemSize >> > (dev_elts1, dev_elts2, dev_result, size);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(result, dev_result, sizeof(T), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(result, dev_result, sizeof(T), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
 Error:
+    DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_elts1);
     cudaFree(dev_elts2);
     cudaFree(dev_result);
-
     return cudaStatus;
 }
 
@@ -988,57 +888,26 @@ template <typename T>
 cudaError_t cuda_clear(T* elts, unsigned int size) {
     T* dev_elts = 0;
     cudaError_t cudaStatus;
+    CREATE_CUDA_STREAM(stream);
 
-    // Choose which GPU to run on, change this on a multi-GPU system.
     cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Allocate GPU buffers for three vectors (two input, one output)    .
     cudaStatus = cudaMalloc((void**)&dev_elts, size * sizeof(T));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
+    if (cudaStatus != cudaSuccess) goto Error;
 
+    cudaStatus = cudaMemcpyAsync(dev_elts, elts, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_elts, elts, size * sizeof(T), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    clearKernel << <gridSize, blockSize, 0, stream >> > (dev_elts, size);
 
-
-    // Launch a kernel on the GPU with one thread for each element.
-    clearKernel << <1, size >> > (dev_elts);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(elts, dev_elts, size * sizeof(T), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
+    cudaStatus = cudaMemcpyAsync(elts, dev_elts, size * sizeof(T), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
 
 Error:
+    DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_elts);
-
     return cudaStatus;
 }
