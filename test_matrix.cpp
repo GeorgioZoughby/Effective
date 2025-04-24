@@ -1,4 +1,4 @@
-#include "../include/HMatrix.h"
+#include "include/HMatrix.h"
 
 int main() {
     Matrix<float> A(2, 2);
