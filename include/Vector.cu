@@ -3,32 +3,40 @@
 #include <iterator>
 #include <stdexcept>
 #include <functional>
+#include <cassert>
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 
-
-struct Add {
-    __device__ void operator()(int& a, int b) const {
+template <typename T>
+class Add {
+public:
+    __device__ void operator()(T& a, T b) const {
         a += b;
     }
 };
 
-struct Subtract {
-    __device__ void operator()(int& a, int b) const {
+template <typename T>
+class Subtract {
+public:
+    __device__ void operator()(T& a, T b) const {
         a -= b;
     }
 };
 
-struct Multiply {
-    __device__ void operator()(int& a, int b) const {
+template <typename T>
+class Multiply {
+public:
+    __device__ void operator()(T& a, T b) const {
         a *= b;
     }
 };
 
-struct Divide {
-    __device__ void operator()(int& a, int b) const {
+template <typename T>
+class Divide {
+public:
+    __device__ void operator()(T& a, T b) const {
         a /= b;
     }
 };
@@ -46,6 +54,8 @@ template <typename T>
 cudaError_t cuda_dot(const T* elts1, const T* elts2, unsigned int size, T* result);
 template <typename T>
 cudaError_t cuda_clear(T* elts, unsigned int size);
+template <typename Op, typename T>
+cudaError_t cuda_vector_op(T* elts1, const T* elts2, unsigned int size, Op op);
 
 
 template <typename T>
@@ -124,8 +134,14 @@ __global__ void clearKernel(T* elts, int size) {
     }
 }
 
+template <typename Op, typename T>
+__global__ void vectorOpKernel(T* elts1, const T* elts2, unsigned int size, Op op) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-
+    if (index < size) {
+        op(elts1[index], elts2[index]);
+    }
+}
 
 
 
@@ -200,10 +216,12 @@ namespace expr {
         return VectorAdd<T>(a, b);
     }
 
+
     template <typename T>
     VectorSub<T> operator-(const VectorExpression<T>& a, const VectorExpression<T>& b) {
         return VectorSub<T>(a, b);
     }
+
 
     template <typename T>
     VectorMul<T> operator*(const VectorExpression<T>& a, const VectorExpression<T>& b) {
@@ -212,12 +230,13 @@ namespace expr {
 }
 
 
+
 template <typename T>
 class Vector : public VectorExpression<T> {
 public:
     /*--------Constructors--------*/
 
-    // Default Constructor        
+    // Default Constructor
     Vector() : _size(0), _elements(nullptr), _capacity(0) {}
 
     // //Default initialisation of values--more safe--for large vector it will be slow
@@ -465,22 +484,22 @@ public:
 
 
     Vector<T>& operator+=(const T& scalar) {
-        cuda_scalar_op(_elements, scalar, _size, Add());
+        cuda_scalar_op(_elements, scalar, _size, Add<T>());
         return *this;
     }
 
     Vector<T>& operator-=(const T& scalar) {
-        cuda_scalar_op(_elements, scalar, _size, Subtract());
+        cuda_scalar_op(_elements, scalar, _size, Subtract<T>());
         return *this;
     }
 
     Vector<T>& operator*=(const T& scalar) {
-        cuda_scalar_op(_elements, scalar, _size, Multiply());
+        cuda_scalar_op(_elements, scalar, _size, Multiply<T>());
         return *this;
     }
 
     Vector<T>& operator/=(const T& scalar) {
-        cuda_scalar_op(_elements, scalar, _size, Divide());
+        cuda_scalar_op(_elements, scalar, _size, Divide<T>());
         return *this;
     }
     /*----------------------------*/
@@ -628,6 +647,69 @@ Vector<T> operator*(const T& scalar, const Vector<T>& v) {
     return v * scalar;
 }
 
+
+template <typename T>
+Vector<T> operator+(const Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+    Vector<T> res(a);
+
+    cuda_vector_op(res.data(), b.data(), a.size(), Add<T>());
+
+    return res;
+}
+
+template <typename T>
+Vector<T> operator+=(Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+    cuda_vector_op(a.data(), b.data(), a.size(), Add<T>());
+
+    return res;
+}
+
+template <typename T>
+Vector<T> operator-(const Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+    Vector<T> res(a);
+
+    cuda_vector_op(res.data(), b.data(), a.size(), Subtract<T>());
+
+    return res;
+}
+
+template <typename T>
+Vector<T> operator-=(const Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+    cuda_vector_op(a.data(), b.data(), a.size(), Subtract<T>());
+
+    return res;
+}
+
+template <typename T>
+Vector<T> operator*(const Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+    Vector<T> res(a);
+
+    cuda_vector_op(res.data(), b.data(), a.size(), Multiply<T>());
+
+    return res;
+}
+
+template <typename T>
+Vector<T> operator*=(const Vector<T>& a, const Vector<T>& b) {
+    assert(a.size() == b.size());
+
+
+    cuda_vector_op(a.data(), b.data(), a.size(), Multiply<T>());
+
+    return res;
+}
+
+
 template<typename T>
 Vector<T> operator/(const Vector<T>& v, const T& scalar) {
     Vector<T> result(v);
@@ -637,75 +719,75 @@ Vector<T> operator/(const Vector<T>& v, const T& scalar) {
 
 
 using namespace expr;
-int main() {
-    Vector<int> v;
-
-    std::cout << "Pushing 3 elements...\n";
-    v.push_back(10);
-    v.push_back(20);
-    v.push_back(30);
-
-    std::cout << "Front: " << v.front() << "\n";
-    std::cout << "Back: " << v.back() << "\n";
-    std::cout << "At(1): " << v.at(1) << "\n";
-
-    std::cout << "Using operator[]: ";
-    for (int i = 0; i < v.size(); ++i) std::cout << v[i] << " ";
-    std::cout << "\n";
-
-    std::cout << "Size: " << v.size() << ", Capacity: " << v.capacity() << "\n";
-
-    std::cout << "Pop back...\n";
-    v.pop_back();
-    std::cout << "Size: " << v.size() << ", Back: " << v.back() << "\n";
-
-    std::cout << "Resizing to 5 with default value 99...\n";
-    v.resize(5, 99);
-    for (int i = 0; i < v.size(); ++i) std::cout << v[i] << " ";
-    std::cout << "\n";
-
-    std::cout << "Clearing vector...\n";
-    v.clear();
-    std::cout << "Size after clear: " << v.size() << ", Empty? " << v.empty() << "\n";
-
-    std::cout << "Testing iterators (push then iterate):\n";
-    for (int i = 1; i <= 5; ++i) v.push_back(i * 10);
-    for (auto it = v.begin(); it != v.end(); ++it)
-        std::cout << *it << " ";
-    std::cout << "\n";
-
-    Vector<int> v1;
-    for (int i = 0; i < 5; ++i) v1.push_back(i + 1);
-
-    // Arithmetic expressions
-    Vector<int> sum = v + v1;
-    Vector<int> diff = v - v1;
-    Vector<int> prod = v * v1;
-    Vector<int> scaled = v * 2;
-    Vector<int> shifted = v + 5;
-
-    std::cout << "v + v1: ";
-    for (int i = 0; i < sum.size(); ++i) std::cout << sum[i] << " ";
-    std::cout << "\nv - v1: ";
-    for (int i = 0; i < diff.size(); ++i) std::cout << diff[i] << " ";
-    std::cout << "\nv * v1: ";
-    for (int i = 0; i < prod.size(); ++i) std::cout << prod[i] << " ";
-    std::cout << "\nv * 2: ";
-    for (int i = 0; i < scaled.size(); ++i) std::cout << scaled[i] << " ";
-    std::cout << "\nv + 5: ";
-    for (int i = 0; i < shifted.size(); ++i) std::cout << shifted[i] << " ";
-    std::cout << "\n";
-    std::cout << "v + 5: size = " << shifted.size() << "\n";
-
-
-    std::cout << "Dot product v . v1: " << v.dot(v1) << "\n";
-
-    std::cout << "Equality test: v == v1? " << (v == v1 ? "true" : "false") << "\n";
-    std::cout << "Inequality test: v != v1? " << (v != v1 ? "true" : "false") << "\n";
-
-
-    return 0;
-}
+//int main() {
+//    Vector<int> v;
+//
+//    std::cout << "Pushing 3 elements...\n";
+//    v.push_back(10);
+//    v.push_back(20);
+//    v.push_back(30);
+//
+//    std::cout << "Front: " << v.front() << "\n";
+//    std::cout << "Back: " << v.back() << "\n";
+//    std::cout << "At(1): " << v.at(1) << "\n";
+//
+//    std::cout << "Using operator[]: ";
+//    for (int i = 0; i < v.size(); ++i) std::cout << v[i] << " ";
+//    std::cout << "\n";
+//
+//    std::cout << "Size: " << v.size() << ", Capacity: " << v.capacity() << "\n";
+//
+//    std::cout << "Pop back...\n";
+//    v.pop_back();
+//    std::cout << "Size: " << v.size() << ", Back: " << v.back() << "\n";
+//
+//    std::cout << "Resizing to 5 with default value 99...\n";
+//    v.resize(5, 99);
+//    for (int i = 0; i < v.size(); ++i) std::cout << v[i] << " ";
+//    std::cout << "\n";
+//
+//    std::cout << "Clearing vector...\n";
+//    v.clear();
+//    std::cout << "Size after clear: " << v.size() << ", Empty? " << v.empty() << "\n";
+//
+//    std::cout << "Testing iterators (push then iterate):\n";
+//    for (int i = 1; i <= 5; ++i) v.push_back(i * 10);
+//    for (auto it = v.begin(); it != v.end(); ++it)
+//        std::cout << *it << " ";
+//    std::cout << "\n";
+//
+//    Vector<int> v1;
+//    for (int i = 0; i < 5; ++i) v1.push_back(i + 1);
+//
+//    // Arithmetic expressions
+//    Vector<int> sum = v + v1;
+//    Vector<int> diff = v - v1;
+//    Vector<int> prod = v * v1;
+//    Vector<int> scaled = v * 2;
+//    Vector<int> shifted = v + 5;
+//
+//    std::cout << "v + v1: ";
+//    for (int i = 0; i < sum.size(); ++i) std::cout << sum[i] << " ";
+//    std::cout << "\nv - v1: ";
+//    for (int i = 0; i < diff.size(); ++i) std::cout << diff[i] << " ";
+//    std::cout << "\nv * v1: ";
+//    for (int i = 0; i < prod.size(); ++i) std::cout << prod[i] << " ";
+//    std::cout << "\nv * 2: ";
+//    for (int i = 0; i < scaled.size(); ++i) std::cout << scaled[i] << " ";
+//    std::cout << "\nv + 5: ";
+//    for (int i = 0; i < shifted.size(); ++i) std::cout << shifted[i] << " ";
+//    std::cout << "\n";
+//    std::cout << "v + 5: size = " << shifted.size() << "\n";
+//
+//
+//    std::cout << "Dot product v . v1: " << v.dot(v1) << "\n";
+//
+//    std::cout << "Equality test: v == v1? " << (v == v1 ? "true" : "false") << "\n";
+//    std::cout << "Inequality test: v != v1? " << (v != v1 ? "true" : "false") << "\n";
+//
+//
+//    return 0;
+//}
 
 
 
@@ -752,11 +834,86 @@ cudaError_t cuda_copy(const T* from, T* to, unsigned int size) {
     cudaStatus = cudaMemcpyAsync(to, dev_to, size * sizeof(T), cudaMemcpyDeviceToHost, stream);
     if (cudaStatus != cudaSuccess) goto Error;
 
+
 Error:
     DESTROY_CUDA_STREAM(stream);
     cudaFree(dev_to);
     cudaFree(dev_from);
     return cudaStatus;
+}
+
+template <typename Op, typename T>
+cudaError_t cuda_vector_op(T* elts1, const T* elts2, unsigned int size, Op op) {
+    T* d_elts1 = nullptr;
+    T* d_elts2 = nullptr;
+    cudaError_t cudaStatus;
+
+    cudaStream_t stream;
+    cudaStatus = cudaStreamCreate(&stream);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaStreamCreate failed!" << std::endl;
+        return cudaStatus;
+    }
+
+    cudaStatus = cudaMalloc((void**)&d_elts1, size * sizeof(T));
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMalloc failed for d_elts1!" << std::endl;
+        cudaStreamDestroy(stream);
+        return cudaStatus;
+    }
+
+    cudaStatus = cudaMalloc((void**)&d_elts2, size * sizeof(T));
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMalloc failed for d_elts2!" << std::endl;
+        cudaFree(d_elts1);
+        cudaStreamDestroy(stream);
+        return cudaStatus;
+    }
+
+    cudaStatus = cudaMemcpyAsync(d_elts1, elts1, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed for elts1!" << std::endl;
+        cudaFree(d_elts1);
+        cudaFree(d_elts2);
+        cudaStreamDestroy(stream);
+        return cudaStatus;
+    }
+
+    cudaStatus = cudaMemcpyAsync(d_elts2, elts2, size * sizeof(T), cudaMemcpyHostToDevice, stream);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed for elts2!" << std::endl;
+        cudaFree(d_elts1);
+        cudaFree(d_elts2);
+        cudaStreamDestroy(stream);
+        return cudaStatus;
+    }
+
+    int blockSize = 256;
+    int numBlocks = (size + blockSize - 1) / blockSize;
+
+    vectorOpKernel << <numBlocks, blockSize, 0, stream >> > (d_elts1, d_elts2, size, op);
+
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "CUDA kernel launch failed: " << cudaGetErrorString(cudaStatus) << std::endl;
+        cudaFree(d_elts1);
+        cudaFree(d_elts2);
+        cudaStreamDestroy(stream);
+        return cudaStatus;
+    }
+
+    cudaStatus = cudaMemcpyAsync(elts1, d_elts1, size * sizeof(T), cudaMemcpyDeviceToHost, stream);
+    if (cudaStatus != cudaSuccess) goto Error;
+
+ Error:
+    cudaStreamSynchronize(stream);
+
+    cudaFree(d_elts1);
+    cudaFree(d_elts2);
+
+    cudaStreamDestroy(stream);
+
+    return cudaSuccess;
 }
 
 
