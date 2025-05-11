@@ -2,8 +2,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/python_module.dir/link.d"
   "CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o"
   "CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o.d"
-  "libpython_module.pdb"
-  "libpython_module.so"
+  "python_module.cpython-313-x86_64-linux-gnu.so"
+  "python_module.pdb"
 )
 
 # Per-language clean rules from dependency scanning.

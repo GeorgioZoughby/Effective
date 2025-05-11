@@ -63,52 +63,74 @@ CMAKE_BINARY_DIR = /home/georgio/Desktop/Cpp/Project_Effective/build
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/python_module.dir/all
+all: CMakeFiles/matrix_cpu.dir/all
+all: extern/pybind11/all
 .PHONY : all
 
 # The main recursive "codegen" target.
-codegen: CMakeFiles/python_module.dir/codegen
+codegen: CMakeFiles/matrix_cpu.dir/codegen
+codegen: extern/pybind11/codegen
 .PHONY : codegen
 
 # The main recursive "preinstall" target.
-preinstall:
+preinstall: extern/pybind11/preinstall
 .PHONY : preinstall
 
 # The main recursive "clean" target.
-clean: CMakeFiles/python_module.dir/clean
+clean: CMakeFiles/matrix_cpu.dir/clean
+clean: extern/pybind11/clean
 .PHONY : clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/python_module.dir
+# Directory level rules for directory extern/pybind11
+
+# Recursive "all" directory target.
+extern/pybind11/all:
+.PHONY : extern/pybind11/all
+
+# Recursive "codegen" directory target.
+extern/pybind11/codegen:
+.PHONY : extern/pybind11/codegen
+
+# Recursive "preinstall" directory target.
+extern/pybind11/preinstall:
+.PHONY : extern/pybind11/preinstall
+
+# Recursive "clean" directory target.
+extern/pybind11/clean:
+.PHONY : extern/pybind11/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/matrix_cpu.dir
 
 # All Build rule for target.
-CMakeFiles/python_module.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=1,2 "Built target python_module"
-.PHONY : CMakeFiles/python_module.dir/all
+CMakeFiles/matrix_cpu.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=1,2 "Built target matrix_cpu"
+.PHONY : CMakeFiles/matrix_cpu.dir/all
 
 # Build rule for subdir invocation for target.
-CMakeFiles/python_module.dir/rule: cmake_check_build_system
+CMakeFiles/matrix_cpu.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/python_module.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/matrix_cpu.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles 0
-.PHONY : CMakeFiles/python_module.dir/rule
+.PHONY : CMakeFiles/matrix_cpu.dir/rule
 
 # Convenience name for target.
-python_module: CMakeFiles/python_module.dir/rule
-.PHONY : python_module
+matrix_cpu: CMakeFiles/matrix_cpu.dir/rule
+.PHONY : matrix_cpu
 
 # codegen rule for target.
-CMakeFiles/python_module.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=1,2 "Finished codegen for target python_module"
-.PHONY : CMakeFiles/python_module.dir/codegen
+CMakeFiles/matrix_cpu.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=1,2 "Finished codegen for target matrix_cpu"
+.PHONY : CMakeFiles/matrix_cpu.dir/codegen
 
 # clean rule for target.
-CMakeFiles/python_module.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/clean
-.PHONY : CMakeFiles/python_module.dir/clean
+CMakeFiles/matrix_cpu.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/clean
+.PHONY : CMakeFiles/matrix_cpu.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

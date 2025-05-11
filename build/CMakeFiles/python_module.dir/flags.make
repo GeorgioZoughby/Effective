@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -Dpython_module_EXPORTS
 
-CXX_INCLUDES = -isystem /usr/include/python3.13 -isystem /home/georgio/Desktop/Cpp/Project_Effective/env/lib/python3.13/site-packages/pybind11/include
+CXX_INCLUDES = -isystem /usr/include/python3.13 -isystem /home/georgio/Desktop/Cpp/Project_Effective/extern/pybind11/include
 
-CXX_FLAGS = -fPIC
+CXX_FLAGS = -std=gnu++17 -fPIC -fvisibility=hidden -flto -fno-fat-lto-objects
 

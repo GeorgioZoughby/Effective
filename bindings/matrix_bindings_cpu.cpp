@@ -41,7 +41,7 @@ void bind_matrix(py::module &m, const std::string &type_name)
             return ss.str(); });
 }
 
-PYBIND11_MODULE(matrix_module, m)
+PYBIND11_MODULE(matrix_cpu, m)
 {
     bind_matrix<int>(m, "MatrixInt");
     bind_matrix<float>(m, "MatrixFloat");

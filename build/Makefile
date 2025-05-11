@@ -117,24 +117,24 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named python_module
+# Target rules for targets named matrix_cpu
 
 # Build rule for target.
-python_module: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 python_module
-.PHONY : python_module
+matrix_cpu: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 matrix_cpu
+.PHONY : matrix_cpu
 
 # fast build rule for target.
-python_module/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/build
-.PHONY : python_module/fast
+matrix_cpu/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/build
+.PHONY : matrix_cpu/fast
 
 bindings/matrix_bindings_cpu.o: bindings/matrix_bindings_cpu.cpp.o
 .PHONY : bindings/matrix_bindings_cpu.o
 
 # target to build an object file
 bindings/matrix_bindings_cpu.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/bindings/matrix_bindings_cpu.cpp.o
 .PHONY : bindings/matrix_bindings_cpu.cpp.o
 
 bindings/matrix_bindings_cpu.i: bindings/matrix_bindings_cpu.cpp.i
@@ -142,7 +142,7 @@ bindings/matrix_bindings_cpu.i: bindings/matrix_bindings_cpu.cpp.i
 
 # target to preprocess a source file
 bindings/matrix_bindings_cpu.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/bindings/matrix_bindings_cpu.cpp.i
 .PHONY : bindings/matrix_bindings_cpu.cpp.i
 
 bindings/matrix_bindings_cpu.s: bindings/matrix_bindings_cpu.cpp.s
@@ -150,7 +150,7 @@ bindings/matrix_bindings_cpu.s: bindings/matrix_bindings_cpu.cpp.s
 
 # target to generate assembly for a file
 bindings/matrix_bindings_cpu.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/python_module.dir/build.make CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/bindings/matrix_bindings_cpu.cpp.s
 .PHONY : bindings/matrix_bindings_cpu.cpp.s
 
 # Help Target
@@ -161,7 +161,7 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... python_module"
+	@echo "... matrix_cpu"
 	@echo "... bindings/matrix_bindings_cpu.o"
 	@echo "... bindings/matrix_bindings_cpu.i"
 	@echo "... bindings/matrix_bindings_cpu.s"

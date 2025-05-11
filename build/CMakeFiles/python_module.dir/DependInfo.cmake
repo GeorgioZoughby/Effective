@@ -9,7 +9,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/georgio/Desktop/Cpp/Project_Effective/bindings/matrix_bindings_cpu.cpp" "CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o" "gcc" "CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o.d"
-  "" "libpython_module.so" "gcc" "CMakeFiles/python_module.dir/link.d"
+  "" "python_module.cpython-313-x86_64-linux-gnu.so" "gcc" "CMakeFiles/python_module.dir/link.d"
   )
 
 # Targets to which this target links which contain Fortran sources.
