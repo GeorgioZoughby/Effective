@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -Wl,--dependency-file=CMakeFiles/python_module.dir/link.d -shared -Wl,-soname,libpython_module.so -o libpython_module.so CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o   -L/usr/lib/libpython3.13.so  -Wl,-rpath,/usr/lib/libpython3.13.so /usr/lib/libpython3.13.so
