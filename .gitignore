@@ -37,4 +37,6 @@
 main
 main2
 build/
+build
+.vscode/
 
