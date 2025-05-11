@@ -1,16 +1,6 @@
 #include "MatrixCuda.cuh"
 
 
-
-// Helper macro to define stream and clean up
-#define CREATE_CUDA_STREAM(stream) \
-    cudaStream_t stream; \
-    cudaStreamCreate(&stream);
-
-#define DESTROY_CUDA_STREAM(stream) \
-    cudaStreamSynchronize(stream); \
-    cudaStreamDestroy(stream);
-
 // CUDA Kernel Implementations
 template <typename T>
 __global__ void copyKernel(const T* from, T* to, int size) {
@@ -43,7 +33,9 @@ __global__ void compareEqKernel(const T* elts1, const T* elts2, bool* equality, 
 
 template <typename T>
 __global__ void dotKernel(const T* elts1, const T* elts2, T* result, unsigned int size) {
-    extern __shared__ T sdata[];
+    extern __shared__ char smem[];
+    T* sdata = reinterpret_cast<T*>(smem);  // Cast shared memory to correct type
+
 
     unsigned int tid = threadIdx.x;
     unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -379,7 +371,7 @@ cudaError_t cuda_matrix_dot(const T* elts1, const T* elts2, unsigned int size, T
 
     int blockSize = 256;
     int gridSize = (size + blockSize - 1) / blockSize;
-    dotProductKernel<<<gridSize, blockSize, 0, stream>>>(dev_elts1, dev_elts2, dev_result, size);
+    dotKernel<<<gridSize, blockSize, 0, stream>>>(dev_elts1, dev_elts2, dev_result, size);
 
     cudaStatus = cudaMemcpyAsync(pinned_result, dev_result, sizeof(T), cudaMemcpyDeviceToHost, stream);
     if (cudaStatus != cudaSuccess) goto Error;
@@ -499,55 +491,6 @@ Error:
     return cudaStatus;
 }
 
-template <typename T>
-cudaError_t cuda_matrix_transpose(const T* input, T* output, int rows, int cols) {
-    T* dev_input = nullptr;
-    T* dev_output = nullptr;
-    T *pinned_input = nullptr, *pinned_output = nullptr;
-    cudaError_t cudaStatus;
-    CREATE_CUDA_STREAM(stream);
-
-    cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    // Allocate pinned memory
-    cudaStatus = cudaMallocHost((void**)&pinned_input, rows * cols * sizeof(T));
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    cudaStatus = cudaMallocHost((void**)&pinned_output, rows * cols * sizeof(T));
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    cudaStatus = cudaMalloc((void**)&dev_input, rows * cols * sizeof(T));
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    cudaStatus = cudaMalloc((void**)&dev_output, rows * cols * sizeof(T));
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    memcpy(pinned_input, input, rows * cols * sizeof(T));
-
-    // Copy to device
-    cudaStatus = cudaMemcpyAsync(dev_input, pinned_input, rows * cols * sizeof(T), cudaMemcpyHostToDevice, stream);
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    dim3 blockSize(16, 16);
-    dim3 gridSize((cols + blockSize.x - 1) / blockSize.x,
-                  (rows + blockSize.y - 1) / blockSize.y);
-    transposeKernel<<<gridSize, blockSize, 0, stream>>>(dev_input, dev_output, rows, cols);
-
-    // Copy the result back to host
-    cudaStatus = cudaMemcpyAsync(pinned_output, dev_output, rows * cols * sizeof(T), cudaMemcpyDeviceToHost, stream);
-    if (cudaStatus != cudaSuccess) goto Error;
-
-    memcpy(output, pinned_output, rows * cols * sizeof(T));
-
-Error:
-    DESTROY_CUDA_STREAM(stream);
-    cudaFree(dev_input);
-    cudaFree(dev_output);
-    cudaFreeHost(pinned_input);
-    cudaFreeHost(pinned_output);
-    return cudaStatus;
-}
 
 template <typename T>
 cudaError_t cuda_matrix_transpose(const T* input, T* output, int rows, int cols) {
