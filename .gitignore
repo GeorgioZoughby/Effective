@@ -31,6 +31,7 @@
 *.out
 *.app
 
+.vs/
 .idea/
 .idea/workspace.xml
 main
