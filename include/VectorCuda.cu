@@ -1,4 +1,4 @@
-#include "VectorCuda.h"
+#include "VectorCuda.cuh"
 
 template <typename T>
 __global__ void copyKernel(const T* from, T* to, int size) {

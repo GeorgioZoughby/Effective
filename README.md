@@ -18,7 +18,7 @@ To install and use these modules, follow these steps:
 1. Clone the repository:
 
    ```bash
-   git clone git@github.com:GeorgioZoughby/Effective.git Project_Effective
+   git clone --recurse-submodules git@github.com:GeorgioZoughby/Effective.git Project_Effective
    cd Project_Effective
    ```
 
@@ -33,14 +33,35 @@ To install and use these modules, follow these steps:
 
 4. Build the modules:
 
+   ## Linux
    ```bash
    mkdir -p build
    cd build
    cmake ..
    make
    ```
+   
+   ## Linux GPU ON
+   ```bash
+   mkdir -p build
+   cd build
+   cmake .. -DBUILD_CUDA=ON
+   make
+   ```
+   
+   ## Windows GPU ON
+   ```bash
+    cmake -S . -B build -DBUILD_CUDA=ON
+    cmake --build build
+   ```
 
-5. The built modules (`matrix_cpu.*.so` and `vector_cpu.*.so`) will be available in the `build` directory.
+   ## Windows GPU OFF
+   ```bash
+    cmake -S . -B build 
+    cmake --build build
+   ```
+
+5. The built modules (`matrix_cpu.*.so`(or `.pyd`) and `vector_cpu.*.so` or (`.pyd`)) will be available in the `build` directory.
 
 ## Matrix API Reference
 
