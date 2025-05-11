@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -flto -Wl,--dependency-file=CMakeFiles/python_module.dir/link.d -shared  -o python_module.cpython-313-x86_64-linux-gnu.so CMakeFiles/python_module.dir/bindings/matrix_bindings_cpu.cpp.o
