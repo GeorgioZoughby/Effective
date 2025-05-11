@@ -8,11 +8,12 @@
 #include <numeric>
 #include <cmath>
 #include <omp.h>
+#include <immintrin.h> // Added for AVX intrinsics
 
 #include "MatrixExpression.h"
 #include "MatrixTranspose.h"
 #include "MatrixCwiseProduct.h"
-#include "MatricCwiseQuotient.h"
+#include "MatrixCwiseQuotient.h"
 #include "MatrixRowView.h"
 #include "MatrixColView.h"
 #include "MatrixBlockView.h"
@@ -119,30 +120,137 @@ public:
 
     void setConstant(const T &value)
     {
-#pragma omp parallel for
-        for (std::size_t i = 0; i < _capacity; ++i)
+        if constexpr (std::is_same_v<T, float>)
         {
-            _data[i] = value;
+            __m256 val_vec = _mm256_set1_ps(value);
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 8 <= _capacity; i += 8)
+            {
+                _mm256_storeu_ps(&_data[i], val_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 8) * 8; i < _capacity; ++i)
+            {
+                _data[i] = value;
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            __m256d val_vec = _mm256_set1_pd(value);
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 4 <= _capacity; i += 4)
+            {
+                _mm256_storeu_pd(&_data[i], val_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 4) * 4; i < _capacity; ++i)
+            {
+                _data[i] = value;
+            }
+        }
+        else
+        {
+#pragma omp parallel for
+            for (std::size_t i = 0; i < _capacity; ++i)
+            {
+                _data[i] = value;
+            }
         }
     }
 
     void setZero()
     {
         static_assert(std::is_arithmetic<T>::value, "setZero() requires an arithmetic type.");
-#pragma omp parallel for
-        for (std::size_t i = 0; i < _capacity; ++i)
+
+        if constexpr (std::is_same_v<T, float>)
         {
-            _data[i] = static_cast<T>(0);
+            __m256 zero_vec = _mm256_setzero_ps();
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 8 <= _capacity; i += 8)
+            {
+                _mm256_storeu_ps(&_data[i], zero_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 8) * 8; i < _capacity; ++i)
+            {
+                _data[i] = 0.0f;
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            __m256d zero_vec = _mm256_setzero_pd();
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 4 <= _capacity; i += 4)
+            {
+                _mm256_storeu_pd(&_data[i], zero_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 4) * 4; i < _capacity; ++i)
+            {
+                _data[i] = 0.0;
+            }
+        }
+        else
+        {
+#pragma omp parallel for
+            for (std::size_t i = 0; i < _capacity; ++i)
+            {
+                _data[i] = static_cast<T>(0);
+            }
         }
     }
 
     void setOnes()
     {
         static_assert(std::is_arithmetic<T>::value, "setOnes() requires an arithmetic type.");
-#pragma omp parallel for
-        for (std::size_t i = 0; i < _capacity; ++i)
+
+        if constexpr (std::is_same_v<T, float>)
         {
-            _data[i] = static_cast<T>(1);
+            __m256 ones_vec = _mm256_set1_ps(1.0f);
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 8 <= _capacity; i += 8)
+            {
+                _mm256_storeu_ps(&_data[i], ones_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 8) * 8; i < _capacity; ++i)
+            {
+                _data[i] = 1.0f;
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            __m256d ones_vec = _mm256_set1_pd(1.0);
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i + 4 <= _capacity; i += 4)
+            {
+                _mm256_storeu_pd(&_data[i], ones_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 4) * 4; i < _capacity; ++i)
+            {
+                _data[i] = 1.0;
+            }
+        }
+        else
+        {
+#pragma omp parallel for
+            for (std::size_t i = 0; i < _capacity; ++i)
+            {
+                _data[i] = static_cast<T>(1);
+            }
         }
     }
 
@@ -268,33 +376,117 @@ public:
     T dot(const MatrixExpression<T> &other) const
     {
         assert(_rows == other.rows() && _cols == other.columns());
-        T sum = T();
 
         if constexpr (std::is_same_v<T, float>)
         {
-#pragma omp parallel for reduction(+ : sum)
-            for (std::size_t i = 0; i < _rows; ++i)
+            float result = 0.0f;
+
+#pragma omp parallel
             {
-                for (std::size_t j = 0; j < _cols; ++j)
+                __m256 local_sum = _mm256_setzero_ps();
+
+#pragma omp for collapse(2) nowait
+                for (std::size_t i = 0; i < _rows; ++i)
                 {
-                    sum += (*this)(i, j) * other(i, j);
+                    for (std::size_t j = 0; j + 8 <= _cols; j += 8)
+                    {
+                        // For MatrixExpression, we need to load values one by one
+                        float a_values[8];
+                        float b_values[8];
+
+                        for (int k = 0; k < 8; ++k)
+                        {
+                            a_values[k] = _data[i * _cols + j + k];
+                            b_values[k] = other(i, j + k);
+                        }
+
+                        // Load into AVX registers
+                        __m256 a = _mm256_loadu_ps(a_values);
+                        __m256 b = _mm256_loadu_ps(b_values);
+
+                        // Compute a * b + local_sum
+                        local_sum = _mm256_fmadd_ps(a, b, local_sum);
+                    }
                 }
+
+                // Process remaining elements
+                float temp[8];
+                _mm256_storeu_ps(temp, local_sum);
+                float thread_sum = temp[0] + temp[1] + temp[2] + temp[3] +
+                                   temp[4] + temp[5] + temp[6] + temp[7];
+
+#pragma omp for collapse(2) reduction(+ : thread_sum)
+                for (std::size_t i = 0; i < _rows; ++i)
+                {
+                    for (std::size_t j = (_cols / 8) * 8; j < _cols; ++j)
+                    {
+                        thread_sum += (*this)(i, j) * other(i, j);
+                    }
+                }
+
+#pragma omp atomic
+                result += thread_sum;
             }
+
+            return result;
         }
         else if constexpr (std::is_same_v<T, double>)
         {
-#pragma omp parallel for reduction(+ : sum)
-            for (std::size_t i = 0; i < _rows; ++i)
+            double result = 0.0;
+
+#pragma omp parallel
             {
-                for (std::size_t j = 0; j < _cols; ++j)
+                __m256d local_sum = _mm256_setzero_pd();
+
+#pragma omp for collapse(2) nowait
+                for (std::size_t i = 0; i < _rows; ++i)
                 {
-                    sum += (*this)(i, j) * other(i, j);
+                    for (std::size_t j = 0; j + 4 <= _cols; j += 4)
+                    {
+                        // For MatrixExpression, we need to load values one by one
+                        double a_values[4];
+                        double b_values[4];
+
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            a_values[k] = _data[i * _cols + j + k];
+                            b_values[k] = other(i, j + k);
+                        }
+
+                        // Load into AVX registers
+                        __m256d a = _mm256_loadu_pd(a_values);
+                        __m256d b = _mm256_loadu_pd(b_values);
+
+                        // Compute a * b + local_sum
+                        local_sum = _mm256_fmadd_pd(a, b, local_sum);
+                    }
                 }
+
+                // Process remaining elements
+                double temp[4];
+                _mm256_storeu_pd(temp, local_sum);
+                double thread_sum = temp[0] + temp[1] + temp[2] + temp[3];
+
+#pragma omp for collapse(2) reduction(+ : thread_sum)
+                for (std::size_t i = 0; i < _rows; ++i)
+                {
+                    for (std::size_t j = (_cols / 4) * 4; j < _cols; ++j)
+                    {
+                        thread_sum += (*this)(i, j) * other(i, j);
+                    }
+                }
+
+#pragma omp atomic
+                result += thread_sum;
             }
+
+            return result;
         }
         else
         {
-#pragma omp parallel for reduction(+ : sum)
+            T sum = T();
+
+#pragma omp parallel for collapse(2) reduction(+ : sum)
             for (std::size_t i = 0; i < _rows; ++i)
             {
                 for (std::size_t j = 0; j < _cols; ++j)
@@ -302,22 +494,92 @@ public:
                     sum += (*this)(i, j) * other(i, j);
                 }
             }
-        }
 
-        return sum;
+            return sum;
+        }
     }
 
     T sum() const
     {
-        T total = T();
+        if constexpr (std::is_same_v<T, float>)
+        {
+            float result = 0.0f;
+
+#pragma omp parallel
+            {
+                __m256 local_sum = _mm256_setzero_ps();
+
+#pragma omp for nowait
+                for (std::size_t i = 0; i + 8 <= _capacity; i += 8)
+                {
+                    __m256 data_vec = _mm256_loadu_ps(&_data[i]);
+                    local_sum = _mm256_add_ps(local_sum, data_vec);
+                }
+
+                // Reduce the vector to a scalar
+                float temp[8];
+                _mm256_storeu_ps(temp, local_sum);
+                float thread_sum = temp[0] + temp[1] + temp[2] + temp[3] +
+                                   temp[4] + temp[5] + temp[6] + temp[7];
+
+                // Process remaining elements
+#pragma omp for reduction(+ : thread_sum)
+                for (std::size_t i = (_capacity / 8) * 8; i < _capacity; ++i)
+                {
+                    thread_sum += _data[i];
+                }
+
+#pragma omp atomic
+                result += thread_sum;
+            }
+
+            return result;
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            double result = 0.0;
+
+#pragma omp parallel
+            {
+                __m256d local_sum = _mm256_setzero_pd();
+
+#pragma omp for nowait
+                for (std::size_t i = 0; i + 4 <= _capacity; i += 4)
+                {
+                    __m256d data_vec = _mm256_loadu_pd(&_data[i]);
+                    local_sum = _mm256_add_pd(local_sum, data_vec);
+                }
+
+                // Reduce the vector to a scalar
+                double temp[4];
+                _mm256_storeu_pd(temp, local_sum);
+                double thread_sum = temp[0] + temp[1] + temp[2] + temp[3];
+
+                // Process remaining elements
+#pragma omp for reduction(+ : thread_sum)
+                for (std::size_t i = (_capacity / 4) * 4; i < _capacity; ++i)
+                {
+                    thread_sum += _data[i];
+                }
+
+#pragma omp atomic
+                result += thread_sum;
+            }
+
+            return result;
+        }
+        else
+        {
+            T total = T();
 
 #pragma omp parallel for reduction(+ : total)
-        for (std::size_t i = 0; i < _capacity; ++i)
-        {
-            total += _data[i];
-        }
+            for (std::size_t i = 0; i < _capacity; ++i)
+            {
+                total += _data[i];
+            }
 
-        return total;
+            return total;
+        }
     }
 
     T minCoeff() const
@@ -346,16 +608,36 @@ public:
 
         if constexpr (std::is_same_v<T, float>)
         {
+            __m256 norm_vec = _mm256_set1_ps(n);
+
 #pragma omp parallel for
-            for (std::size_t i = 0; i < _capacity; ++i)
+            for (std::size_t i = 0; i + 8 <= _capacity; i += 8)
+            {
+                __m256 data_vec = _mm256_loadu_ps(&_data[i]);
+                __m256 result_vec = _mm256_div_ps(data_vec, norm_vec);
+                _mm256_storeu_ps(&result._data[i], result_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 8) * 8; i < _capacity; ++i)
             {
                 result._data[i] = _data[i] / n;
             }
         }
         else if constexpr (std::is_same_v<T, double>)
         {
+            __m256d norm_vec = _mm256_set1_pd(n);
+
 #pragma omp parallel for
-            for (std::size_t i = 0; i < _capacity; ++i)
+            for (std::size_t i = 0; i + 4 <= _capacity; i += 4)
+            {
+                __m256d data_vec = _mm256_loadu_pd(&_data[i]);
+                __m256d result_vec = _mm256_div_pd(data_vec, norm_vec);
+                _mm256_storeu_pd(&result._data[i], result_vec);
+            }
+
+#pragma omp parallel for
+            for (std::size_t i = (_capacity / 4) * 4; i < _capacity; ++i)
             {
                 result._data[i] = _data[i] / n;
             }

@@ -9,7 +9,7 @@
 #include "MatrixNegate.h"
 
 #include "MatrixCwiseProduct.h"
-#include "MatricCwiseQuotient.h"
+#include "MatrixCwiseQuotient.h"
 
 #include "MatrixScalarMul.h"
 #include "MatrixScalarDiv.h"
@@ -19,6 +19,5 @@
 #include "MatrixRowView.h"
 #include "MatrixBlockView.h"
 #include "MatrixCompare.h"
-
 
 #endif // HMATRIX_H

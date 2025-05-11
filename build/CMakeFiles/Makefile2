@@ -64,11 +64,13 @@ CMAKE_BINARY_DIR = /home/georgio/Desktop/Cpp/Project_Effective/build
 
 # The main recursive "all" target.
 all: CMakeFiles/matrix_cpu.dir/all
+all: CMakeFiles/vector_cpu.dir/all
 all: extern/pybind11/all
 .PHONY : all
 
 # The main recursive "codegen" target.
 codegen: CMakeFiles/matrix_cpu.dir/codegen
+codegen: CMakeFiles/vector_cpu.dir/codegen
 codegen: extern/pybind11/codegen
 .PHONY : codegen
 
@@ -78,6 +80,7 @@ preinstall: extern/pybind11/preinstall
 
 # The main recursive "clean" target.
 clean: CMakeFiles/matrix_cpu.dir/clean
+clean: CMakeFiles/vector_cpu.dir/clean
 clean: extern/pybind11/clean
 .PHONY : clean
 
@@ -131,6 +134,38 @@ CMakeFiles/matrix_cpu.dir/codegen:
 CMakeFiles/matrix_cpu.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/clean
 .PHONY : CMakeFiles/matrix_cpu.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/vector_cpu.dir
+
+# All Build rule for target.
+CMakeFiles/vector_cpu.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=3,4 "Built target vector_cpu"
+.PHONY : CMakeFiles/vector_cpu.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/vector_cpu.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/vector_cpu.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles 0
+.PHONY : CMakeFiles/vector_cpu.dir/rule
+
+# Convenience name for target.
+vector_cpu: CMakeFiles/vector_cpu.dir/rule
+.PHONY : vector_cpu
+
+# codegen rule for target.
+CMakeFiles/vector_cpu.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles --progress-num=3,4 "Finished codegen for target vector_cpu"
+.PHONY : CMakeFiles/vector_cpu.dir/codegen
+
+# clean rule for target.
+CMakeFiles/vector_cpu.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/clean
+.PHONY : CMakeFiles/vector_cpu.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

@@ -129,6 +129,19 @@ matrix_cpu/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/build
 .PHONY : matrix_cpu/fast
 
+#=============================================================================
+# Target rules for targets named vector_cpu
+
+# Build rule for target.
+vector_cpu: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 vector_cpu
+.PHONY : vector_cpu
+
+# fast build rule for target.
+vector_cpu/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/build
+.PHONY : vector_cpu/fast
+
 bindings/matrix_bindings_cpu.o: bindings/matrix_bindings_cpu.cpp.o
 .PHONY : bindings/matrix_bindings_cpu.o
 
@@ -153,6 +166,30 @@ bindings/matrix_bindings_cpu.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_cpu.dir/build.make CMakeFiles/matrix_cpu.dir/bindings/matrix_bindings_cpu.cpp.s
 .PHONY : bindings/matrix_bindings_cpu.cpp.s
 
+bindings/vector_bindings_cpu.o: bindings/vector_bindings_cpu.cpp.o
+.PHONY : bindings/vector_bindings_cpu.o
+
+# target to build an object file
+bindings/vector_bindings_cpu.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/bindings/vector_bindings_cpu.cpp.o
+.PHONY : bindings/vector_bindings_cpu.cpp.o
+
+bindings/vector_bindings_cpu.i: bindings/vector_bindings_cpu.cpp.i
+.PHONY : bindings/vector_bindings_cpu.i
+
+# target to preprocess a source file
+bindings/vector_bindings_cpu.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/bindings/vector_bindings_cpu.cpp.i
+.PHONY : bindings/vector_bindings_cpu.cpp.i
+
+bindings/vector_bindings_cpu.s: bindings/vector_bindings_cpu.cpp.s
+.PHONY : bindings/vector_bindings_cpu.s
+
+# target to generate assembly for a file
+bindings/vector_bindings_cpu.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vector_cpu.dir/build.make CMakeFiles/vector_cpu.dir/bindings/vector_bindings_cpu.cpp.s
+.PHONY : bindings/vector_bindings_cpu.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -162,9 +199,13 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... matrix_cpu"
+	@echo "... vector_cpu"
 	@echo "... bindings/matrix_bindings_cpu.o"
 	@echo "... bindings/matrix_bindings_cpu.i"
 	@echo "... bindings/matrix_bindings_cpu.s"
+	@echo "... bindings/vector_bindings_cpu.o"
+	@echo "... bindings/vector_bindings_cpu.i"
+	@echo "... bindings/vector_bindings_cpu.s"
 .PHONY : help
 
 
