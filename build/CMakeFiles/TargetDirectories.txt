@@ -1,6 +1,0 @@
-/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles/matrix_cpu.dir
-/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles/vector_cpu.dir
-/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles/edit_cache.dir
-/home/georgio/Desktop/Cpp/Project_Effective/build/CMakeFiles/rebuild_cache.dir
-/home/georgio/Desktop/Cpp/Project_Effective/build/extern/pybind11/CMakeFiles/edit_cache.dir
-/home/georgio/Desktop/Cpp/Project_Effective/build/extern/pybind11/CMakeFiles/rebuild_cache.dir
